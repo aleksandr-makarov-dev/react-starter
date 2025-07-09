@@ -19,6 +19,7 @@ type FormProps<TFormValues extends FieldValues, Schema> = {
   id?: string;
 };
 export function Form<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Schema extends ZodType<any, any, any>,
   TFormValues extends FieldValues = z.infer<Schema>
 >({

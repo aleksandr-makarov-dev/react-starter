@@ -15,6 +15,7 @@ export type FormFieldProps<TFormValues extends FieldValues> = {
   helperText?: string;
   optional?: boolean;
   optionalText?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (field: any) => React.ReactNode;
 };
 

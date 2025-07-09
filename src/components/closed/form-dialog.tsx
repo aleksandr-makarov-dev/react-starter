@@ -9,17 +9,17 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 
-export type DialogProps = {
+export type FormDialogProps = {
   title: string;
   description?: string;
-  submitButton: React.ReactNode;
+  submitButton?: React.ReactNode;
   children: React.ReactNode;
   cancelButtonLabel?: string;
   open: boolean;
   onOpenChange: (value: boolean) => void;
 };
 
-export function Dialog({
+export function FormDialog({
   title,
   description,
   submitButton,
@@ -27,7 +27,7 @@ export function Dialog({
   cancelButtonLabel = "Cancel",
   open,
   onOpenChange,
-}: DialogProps) {
+}: FormDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -38,7 +38,9 @@ export function Dialog({
         {children}
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">{cancelButtonLabel}</Button>
+            <Button variant="soft" color="gray">
+              {cancelButtonLabel}
+            </Button>
           </DialogClose>
           {submitButton}
         </DialogFooter>

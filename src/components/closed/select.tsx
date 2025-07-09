@@ -1,11 +1,18 @@
-import React from "react";
+"use client";
+
+import * as React from "react";
+import { ChevronsUpDown } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import {
-  Select as SelectRoot,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = {
@@ -14,55 +21,50 @@ export type SelectOption = {
 };
 
 export type SelectProps = {
-  id?: string;
-  name?: string;
-  value: string;
-  onChange: (newValue: string) => void;
-  options: SelectOption[];
-  placeholder?: string;
-  disabled?: boolean;
+  placeholder: string;
+  label: string;
+  value?: string;
+  options?: SelectOption[];
   className?: string;
+  onChange?: (value: string) => void;
 };
 
 export function Select({
-  id,
-  name,
+  placeholder,
+  label,
   value,
-  options,
-  onChange,
-  placeholder = "Select an option",
-  disabled = false,
+  options = [],
   className,
+  onChange,
 }: SelectProps) {
-  const renderedOptions = React.useMemo(
-    () =>
-      options.map((option) => (
-        <SelectItem key={option.value} value={option.value}>
-          {option.label}
-        </SelectItem>
-      )),
-    [options]
+  const activeOption = React.useMemo(
+    () => options.find((option) => option.value === value),
+    [value, options]
   );
 
   return (
-    <SelectRoot
-      name={name}
-      value={value}
-      onValueChange={onChange}
-      disabled={disabled}
-    >
-      <SelectTrigger
-        id={id}
-        className={cn("w-[180px]", className)}
-        aria-label={placeholder}
-      >
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>{renderedOptions}</SelectContent>
-    </SelectRoot>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          className={cn("justify-between w-[200px]", className)}
+          variant="soft"
+          color="gray"
+        >
+          {activeOption ? activeOption.label : placeholder}
+          <ChevronsUpDown className="opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-56" align="start">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
-}
-
-export function createOptions(options: SelectOption[]) {
-  return options;
 }
