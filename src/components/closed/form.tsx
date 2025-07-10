@@ -8,7 +8,7 @@ import {
   type UseFormReturn,
 } from "react-hook-form";
 import { Form as FormRoot } from "../ui/form";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 type FormProps<TFormValues extends FieldValues, Schema> = {
   onSubmit: SubmitHandler<TFormValues>;
