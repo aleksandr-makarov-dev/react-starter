@@ -1,82 +1,44 @@
-import { useMemo } from "react";
-import { Badge, badgeVariants } from "../ui/badge";
+import { Badge, badgeVariants } from "./badge";
 import type { VariantProps } from "class-variance-authority";
-import { AvatarGroup, type AvatarDef } from "./avatar-group";
+import { AvatarGroup, type AvatarDef } from "../closed/avatar-group";
 import { formatDate } from "@/utils/format-date";
 
-export type ColumnDef = {
-  id: string;
-  title: string;
+export type KanbanRootProps = {
+  children: React.ReactNode;
 };
 
-export type GroupDef<T> = {
-  id: string;
-  title: string;
-  items: T[];
-};
-
-export type KanbanProps<T> = {
-  columns?: ColumnDef[] | undefined;
-  data?: T[] | undefined;
-  groupKey: keyof T;
-  render: (group: GroupDef<T>, index: number) => React.ReactNode;
-};
-
-export function Kanban<T>({
-  columns = [],
-  data = [],
-  groupKey,
-  render,
-}: KanbanProps<T>) {
-  const groups = useMemo(() => {
-    const grouped = new Map<string, T[]>();
-
-    for (const item of data) {
-      const key = item[groupKey] as string;
-      if (!grouped.has(key)) {
-        grouped.set(key, []);
-      }
-      grouped.get(key)!.push(item);
-    }
-
-    return columns.map((column) => ({
-      id: column.id,
-      title: column.title,
-      items: grouped.get(column.id) ?? [],
-    }));
-  }, [columns, data, groupKey]);
-
+export function KanbanRoot({ children }: KanbanRootProps) {
   return (
-    <div className="flex flex-row gap-2 flex-1 overflow-x-auto overflow-y-hidden h-full">
-      {groups.map((group, index) => render(group, index))}
+    <div className="flex flex-row gap-2 flex-1 overflow-x-auto overflow-y-hidden h-full relative">
+      {children}
     </div>
   );
 }
 
-export type KanbanColumnProps<T> = {
+export type KanbanColumnProps = {
   title: string;
-  items?: T[];
+  count: number;
+  children: React.ReactNode;
   actions?: React.ReactNode;
-  render: (item: T, index: number) => React.ReactNode;
 };
 
-export function KanbanColumn<T>({
+export function KanbanColumn({
   title,
-  items = [],
+  count,
+  children,
   actions,
-  render,
-}: KanbanColumnProps<T>) {
+}: KanbanColumnProps) {
   return (
     <div className="w-80 shrink-0 bg-accent rounded flex flex-col h-full">
       <div className="p-2 pb-1 flex flex-row items-center">
         <p className="text-sm font-medium flex-1 flex flex-row gap-2">
           <span>{title}</span>
-          <span className="text-muted-foreground">{items.length}</span>
+          <span className="text-muted-foreground">{count}</span>
         </p>
         <div className="flex flex-row gap-1">{actions}</div>
       </div>
       <div className="flex flex-col gap-1.5 flex-1 p-2 pt-1 overflow-y-auto">
-        {items.map((item, index) => render(item, index))}
+        {children}
       </div>
     </div>
   );
