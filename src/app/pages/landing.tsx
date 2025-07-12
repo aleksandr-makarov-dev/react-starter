@@ -9,7 +9,7 @@ import { useDialog } from "@/hooks/use-dialog";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import z from "zod";
-import { MOCK_COLUMNS } from "@/data";
+import { MOCK_COLUMNS, MOCK_ITEMS } from "@/data";
 import { Kanban } from "@/components/closed/kanban";
 
 function LandingPage() {
@@ -29,7 +29,16 @@ function LandingPage() {
 
   return (
     <div className="h-screen flex flex-1 p-2">
-      <Kanban />
+      <Kanban
+        columns={MOCK_COLUMNS}
+        data={MOCK_ITEMS}
+        onColumnDropEnd={({ columnId, index }) =>
+          console.log(`Список=${columnId}; Индекс=${index}`)
+        }
+        onItemDropEnd={({ columnId, index, itemId }) =>
+          console.log(`Элемент=${itemId}; Список=${columnId}; Индекс=${index}`)
+        }
+      />
       <FormDialog
         title="Создание объекта"
         description="Создание объекта очень трудоемкая операция."

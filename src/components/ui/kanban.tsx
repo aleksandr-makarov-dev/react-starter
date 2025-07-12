@@ -5,11 +5,11 @@ import { formatDate } from "@/utils/format-date";
 import type { HtmlHTMLAttributes, Ref } from "react";
 import { cn } from "@/utils/cn";
 
-export type KanbanRootProps = {
+export type KanbanProps = {
   children: React.ReactNode;
 };
 
-export function KanbanRoot({ children }: KanbanRootProps) {
+export function Kanban({ children }: KanbanProps) {
   return (
     <div className="flex flex-row gap-2 flex-1 overflow-x-auto overflow-y-hidden h-full relative">
       {children}
@@ -57,7 +57,6 @@ export type BadgeDef = {
 };
 
 export type KanbanCardProps = {
-  id: string;
   title: string;
   dueDate?: Date | undefined | null;
   badges?: BadgeDef[];
@@ -66,7 +65,6 @@ export type KanbanCardProps = {
 } & HtmlHTMLAttributes<HTMLDivElement>;
 
 export function KanbanCard({
-  id,
   title,
   dueDate,
   users,
@@ -85,7 +83,6 @@ export function KanbanCard({
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-row gap-2 items-center flex-1">
           {users && <AvatarGroup avatars={users} />}
-          <p className="text-sm font-medium text-muted-foreground">{id}</p>
         </div>
         {dueDate && (
           <Badge variant="soft" color="gray">

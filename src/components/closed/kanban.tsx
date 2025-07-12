@@ -30,59 +30,224 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import React from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { KanbanCard, KanbanColumn, KanbanRoot } from "../ui/kanban";
-import { createPortal, unstable_batchedUpdates } from "react-dom";
+import React, { useMemo, useState, useRef, useCallback } from "react";
+import { KanbanCard, KanbanColumn, Kanban as KanbanRoot } from "../ui/kanban";
+import { createPortal } from "react-dom";
 import { Droppable } from "./droppable";
 import { Draggable } from "./draggable";
 import { cn } from "@/utils/cn";
 import { Button } from "../ui/button";
 import { EllipsisVerticalIcon, GripVerticalIcon, PlusIcon } from "lucide-react";
-
-type Items = Record<UniqueIdentifier, UniqueIdentifier[]>;
+import type { ColumnDef, Item } from "@/data";
 
 export const TRASH_ID = "void";
 const PLACEHOLDER_ID = "placeholder";
 
 const dropAnimation: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
-    styles: {
-      active: {
-        opacity: "0.5",
-      },
-    },
+    styles: { active: { opacity: "0.5" } },
   }),
 };
 
 export type KanbanProps = {
-  children: (args: { groups: Items }) => React.ReactNode;
+  columns: ColumnDef[];
+  data: Item[];
+  onItemDropEnd?: (args: {
+    itemId: UniqueIdentifier;
+    columnId: UniqueIdentifier;
+    index: number;
+  }) => void;
+  onColumnDropEnd?: (args: {
+    columnId: UniqueIdentifier;
+    index: number;
+  }) => void;
 };
 
-export function Kanban() {
-  const [items, setItems] = useState<Items>({
-    A: createRange(3, (index) => `A${index + 1}`),
-    B: createRange(5, (index) => `B${index + 1}`),
-    C: createRange(6, (index) => `C${index + 1}`),
-    D: createRange(10, (index) => `D${index + 1}`),
-  });
+export function Kanban({
+  columns,
+  data,
+  onColumnDropEnd,
+  onItemDropEnd,
+}: KanbanProps) {
+  const initialItems = useMemo(() => {
+    return columns.reduce((acc, col) => {
+      acc[col.id] = data.filter((item) => item.columnId === col.id);
+      return acc;
+    }, {} as Record<UniqueIdentifier, Item[]>);
+  }, [columns, data]);
 
-  const [containers, setContainers] = useState(
-    Object.keys(items) as UniqueIdentifier[]
+  const [items, setItems] =
+    useState<Record<UniqueIdentifier, Item[]>>(initialItems);
+  const [containers, setContainers] = useState<UniqueIdentifier[]>(
+    columns.map((col) => col.id)
   );
-
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const lastOverId = useRef<UniqueIdentifier | null>(null);
   const recentlyMovedToNewContainer = useRef(false);
+  const [clonedItems, setClonedItems] = useState<Record<
+    UniqueIdentifier,
+    Item[]
+  > | null>(null);
 
-  /**
-   * Custom collision detection strategy optimized for multiple containers
-   *
-   * - First, find any droppable containers intersecting with the pointer.
-   * - If there are none, find intersecting containers with the active draggable.
-   * - If there are no intersecting containers, return the last matched intersection
-   *
-   */
+  const sensors = useSensors(
+    useSensor(MouseSensor),
+    useSensor(TouchSensor),
+    useSensor(KeyboardSensor, { coordinateGetter })
+  );
+
+  const allItemsFlat = useMemo(() => Object.values(items).flat(), [items]);
+
+  const findContainer = (
+    id: UniqueIdentifier
+  ): UniqueIdentifier | undefined => {
+    if (id in items) return id;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return Object.entries(items).find(([_, list]) =>
+      list.some((item) => item.id === id)
+    )?.[0];
+  };
+
+  const getNextContainerId = (): string => {
+    const containerIds = Object.keys(items);
+    const lastContainerId = containerIds[containerIds.length - 1];
+    return String.fromCharCode(lastContainerId.charCodeAt(0) + 1);
+  };
+
+  const handleDragStart = (event: DragStartEvent): void => {
+    setActiveId(event.active.id);
+    setClonedItems(items);
+  };
+
+  const handleDragCancel = (): void => {
+    if (clonedItems) setItems(clonedItems);
+    setActiveId(null);
+    setClonedItems(null);
+  };
+
+  const handleDragOver = (event: DragOverEvent): void => {
+    const { active, over } = event;
+    const overId = over?.id;
+    if (!overId || overId === TRASH_ID || active.id in items) return;
+
+    const activeContainer = findContainer(active.id);
+    const overContainer = findContainer(overId);
+    if (!activeContainer || !overContainer || activeContainer === overContainer)
+      return;
+
+    const activeIndex = items[activeContainer].findIndex(
+      (i) => i.id === active.id
+    );
+    if (activeIndex === -1) return;
+
+    const overIndex = items[overContainer].findIndex((i) => i.id === overId);
+    const isBelow =
+      active.rect.current?.translated?.top && over?.rect
+        ? active.rect.current.translated.top > over.rect.top + over.rect.height
+        : false;
+
+    const newIndex =
+      overIndex >= 0
+        ? overIndex + (isBelow ? 1 : 0)
+        : items[overContainer].length;
+    recentlyMovedToNewContainer.current = true;
+
+    setItems((prev): Record<UniqueIdentifier, Item[]> => {
+      const activeItem = prev[activeContainer][activeIndex];
+      return {
+        ...prev,
+        [activeContainer]: prev[activeContainer].filter(
+          (item) => item.id !== active.id
+        ),
+        [overContainer]: [
+          ...prev[overContainer].slice(0, newIndex),
+          activeItem,
+          ...prev[overContainer].slice(newIndex),
+        ],
+      };
+    });
+  };
+
+  const handleDragEnd = (event: DragEndEvent): void => {
+    const { active, over } = event;
+    const isContainer = active.id in items;
+
+    if (isContainer && over?.id) {
+      const activeIndex = containers.indexOf(active.id);
+      const overIndex = containers.indexOf(over.id);
+
+      if (activeIndex !== overIndex) {
+        onColumnDropEnd?.({ columnId: String(active.id), index: overIndex });
+        setContainers(arrayMove(containers, activeIndex, overIndex));
+      }
+    }
+
+    if (!isContainer) {
+      const activeContainer = findContainer(active.id);
+      if (!activeContainer) return setActiveId(null);
+
+      const overId = over?.id;
+      if (!overId) return setActiveId(null);
+
+      if (overId === TRASH_ID) {
+        setItems((prev) => ({
+          ...prev,
+          [activeContainer]: prev[activeContainer].filter(
+            (item) => item.id !== active.id
+          ),
+        }));
+        setActiveId(null);
+        return;
+      }
+
+      if (overId === PLACEHOLDER_ID) {
+        const newContainerId = getNextContainerId();
+        const movedItem = items[activeContainer].find(
+          (item) => item.id === active.id
+        );
+        if (!movedItem) return;
+
+        setContainers((prev) => [...prev, newContainerId]);
+        setItems((prev) => ({
+          ...prev,
+          [activeContainer]: prev[activeContainer].filter(
+            (item) => item.id !== active.id
+          ),
+          [newContainerId]: [movedItem],
+        }));
+        setActiveId(null);
+        return;
+      }
+
+      const overContainer = findContainer(overId);
+      if (overContainer) {
+        const activeIndex = items[activeContainer].findIndex(
+          (item) => item.id === active.id
+        );
+        const overIndex = items[overContainer].findIndex(
+          (item) => item.id === overId
+        );
+        if (activeIndex !== overIndex) {
+          setItems((prev) => ({
+            ...prev,
+            [overContainer]: arrayMove(
+              prev[overContainer],
+              activeIndex,
+              overIndex
+            ),
+          }));
+        }
+
+        onItemDropEnd?.({
+          itemId: active.id.toString(),
+          columnId: overContainer,
+          index: overIndex,
+        });
+      }
+    }
+
+    setActiveId(null);
+  };
+
   const collisionDetectionStrategy: CollisionDetection = useCallback(
     (args) => {
       if (activeId && activeId in items) {
@@ -121,7 +286,7 @@ export function Kanban() {
               droppableContainers: args.droppableContainers.filter(
                 (container) =>
                   container.id !== overId &&
-                  containerItems.includes(container.id)
+                  containerItems.map((item) => item.id).includes(container.id)
               ),
             })[0]?.id;
           }
@@ -133,9 +298,9 @@ export function Kanban() {
       }
 
       // When a draggable item moves to a new container, the layout may shift
-      // and the `overId` may become `null`. We manually set the cached `lastOverId`
+      // and the overId may become null. We manually set the cached lastOverId
       // to the id of the draggable item that was moved to the new container, otherwise
-      // the previous `overId` will be returned which can cause items to incorrectly shift positions
+      // the previous overId will be returned which can cause items to incorrectly shift positions
       if (recentlyMovedToNewContainer.current) {
         lastOverId.current = activeId;
       }
@@ -146,199 +311,37 @@ export function Kanban() {
     [activeId, items]
   );
 
-  const [clonedItems, setClonedItems] = useState<Items | null>(null);
-  const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter,
-    })
-  );
-  const findContainer = (id: UniqueIdentifier) => {
-    if (id in items) {
-      return id;
+  const activeItem:
+    | { type: "column"; column: ColumnDef; items: Item[] }
+    | { type: "item"; item: Item }
+    | undefined = useMemo(() => {
+    if (!activeId) return undefined;
+
+    if (containers.includes(activeId)) {
+      const column = columns.find((col) => col.id === activeId);
+      if (!column) return undefined;
+
+      const itemsInColumn = items[activeId] ?? [];
+      return {
+        type: "column",
+        column,
+        items: itemsInColumn,
+      };
     }
 
-    return Object.keys(items).find((key) => items[key].includes(id));
-  };
-
-  const onDragCancel = () => {
-    if (clonedItems) {
-      // Reset items to their original state in case items have been
-      // Dragged across containers
-      setItems(clonedItems);
-    }
-
-    setActiveId(null);
-    setClonedItems(null);
-  };
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      recentlyMovedToNewContainer.current = false;
-    });
-  }, [items]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id);
-    setClonedItems(items);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-
-    const overId = over?.id;
-
-    if (overId == null || overId === TRASH_ID || active.id in items) {
-      return;
-    }
-
-    const overContainer = findContainer(overId);
-    const activeContainer = findContainer(active.id);
-
-    if (!overContainer || !activeContainer) {
-      return;
-    }
-
-    if (activeContainer !== overContainer) {
-      setItems((items) => {
-        const activeItems = items[activeContainer];
-        const overItems = items[overContainer];
-        const overIndex = overItems.indexOf(overId);
-        const activeIndex = activeItems.indexOf(active.id);
-
-        let newIndex: number;
-
-        if (overId in items) {
-          newIndex = overItems.length + 1;
-        } else {
-          const isBelowOverItem =
-            over &&
-            active.rect.current.translated &&
-            active.rect.current.translated.top >
-              over.rect.top + over.rect.height;
-
-          const modifier = isBelowOverItem ? 1 : 0;
-
-          newIndex =
-            overIndex >= 0 ? overIndex + modifier : overItems.length + 1;
-        }
-
-        recentlyMovedToNewContainer.current = true;
-
-        return {
-          ...items,
-          [activeContainer]: items[activeContainer].filter(
-            (item) => item !== active.id
-          ),
-          [overContainer]: [
-            ...items[overContainer].slice(0, newIndex),
-            items[activeContainer][activeIndex],
-            ...items[overContainer].slice(
-              newIndex,
-              items[overContainer].length
-            ),
-          ],
-        };
-      });
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (active.id in items && over?.id) {
-      setContainers((containers) => {
-        const activeIndex = containers.indexOf(active.id);
-        const overIndex = containers.indexOf(over.id);
-
-        return arrayMove(containers, activeIndex, overIndex);
-      });
-    }
-
-    const activeContainer = findContainer(active.id);
-
-    if (!activeContainer) {
-      setActiveId(null);
-      return;
-    }
-
-    const overId = over?.id;
-
-    if (overId == null) {
-      setActiveId(null);
-      return;
-    }
-
-    if (overId === TRASH_ID) {
-      setItems((items) => ({
-        ...items,
-        [activeContainer]: items[activeContainer].filter(
-          (id) => id !== activeId
-        ),
-      }));
-      setActiveId(null);
-      return;
-    }
-
-    if (overId === PLACEHOLDER_ID) {
-      const newContainerId = getNextContainerId();
-
-      unstable_batchedUpdates(() => {
-        setContainers((containers) => [...containers, newContainerId]);
-        setItems((items) => ({
-          ...items,
-          [activeContainer]: items[activeContainer].filter(
-            (id) => id !== activeId
-          ),
-          [newContainerId]: [active.id],
-        }));
-        setActiveId(null);
-      });
-      return;
-    }
-
-    const overContainer = findContainer(overId);
-
-    if (overContainer) {
-      const activeIndex = items[activeContainer].indexOf(active.id);
-      const overIndex = items[overContainer].indexOf(overId);
-
-      if (activeIndex !== overIndex) {
-        setItems((items) => ({
-          ...items,
-          [overContainer]: arrayMove(
-            items[overContainer],
-            activeIndex,
-            overIndex
-          ),
-        }));
-      }
-    }
-
-    setActiveId(null);
-  };
-
-  function getNextContainerId() {
-    const containerIds = Object.keys(items);
-    const lastContainerId = containerIds[containerIds.length - 1];
-
-    return String.fromCharCode(lastContainerId.charCodeAt(0) + 1);
-  }
+    const item = allItemsFlat.find((item) => item.id === activeId);
+    return item ? { type: "item", item } : undefined;
+  }, [activeId, columns, containers, items, allItemsFlat]);
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetectionStrategy}
-      measuring={{
-        droppable: {
-          strategy: MeasuringStrategy.Always,
-        },
-      }}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      onDragCancel={onDragCancel}
     >
       <KanbanRoot>
         {
@@ -356,7 +359,10 @@ export function Kanban() {
                   style,
                   setActivatorNodeRef,
                 }) => {
-                  const containerItems = items[containerId];
+                  const column = columns.find(
+                    (column) => column.id === containerId
+                  );
+                  const containerItems = items[containerId] ?? [];
                   const count = containerItems.length;
 
                   return (
@@ -384,7 +390,7 @@ export function Kanban() {
                                   <GripVerticalIcon />
                                 </Button>
                                 <p className="text-sm font-medium flex-1 flex flex-row gap-2">
-                                  <span>Контейнер {containerId}</span>
+                                  <span>{column?.title}</span>
                                   <span className="text-muted-foreground">
                                     {count}
                                   </span>
@@ -412,8 +418,8 @@ export function Kanban() {
                               items={containerItems}
                               strategy={verticalListSortingStrategy}
                             >
-                              {containerItems.map((value) => (
-                                <Draggable key={value} id={value}>
+                              {containerItems.map((item) => (
+                                <Draggable key={item.id} id={item.id}>
                                   {({
                                     setNodeRef,
                                     attributes,
@@ -423,12 +429,12 @@ export function Kanban() {
                                   }) => (
                                     <KanbanCard
                                       ref={setNodeRef}
-                                      id={value.toString()}
+                                      id={item.id.toString()}
                                       style={style}
                                       className={cn({
                                         "opacity-50": isDragging,
                                       })}
-                                      title={`Задача ${value}`}
+                                      title={item.title}
                                       {...attributes}
                                       {...listeners}
                                     />
@@ -447,13 +453,13 @@ export function Kanban() {
           </SortableContext>
         }
       </KanbanRoot>
-      {createPortal(
-        <DragOverlay dropAnimation={dropAnimation}>
-          {activeId ? (
-            containers.includes(activeId) ? (
+
+      {activeItem &&
+        createPortal(
+          <DragOverlay dropAnimation={dropAnimation}>
+            {activeItem?.type === "column" ? (
               <KanbanColumn
-                id={activeId.toString()}
-                className="ring-2 ring-offset-1 ring-primary cursor-grabbing"
+                className="ring-primary ring-2 ring-offset-1 cursor-grabbing"
                 header={
                   <React.Fragment>
                     <Button
@@ -465,9 +471,9 @@ export function Kanban() {
                       <GripVerticalIcon />
                     </Button>
                     <p className="text-sm font-medium flex-1 flex flex-row gap-2">
-                      <span>Контейнер {activeId}</span>
+                      <span>{activeItem.column.title}</span>
                       <span className="text-muted-foreground">
-                        {items[activeId]?.length}
+                        {activeItem.items.length}
                       </span>
                     </p>
                     <div className="flex flex-row gap-1 items-center">
@@ -481,41 +487,22 @@ export function Kanban() {
                   </React.Fragment>
                 }
               >
-                {items[activeId].map((value) => (
-                  <KanbanCard
-                    key={value}
-                    id={value.toString()}
-                    title={`Задача ${value}`}
-                  />
+                {activeItem.items.map((item) => (
+                  <KanbanCard title={item.title} />
                 ))}
               </KanbanColumn>
-            ) : (
+            ) : activeItem?.type === "item" ? (
               <KanbanCard
-                id={activeId.toString()}
-                className="ring-2 ring-offset-1 ring-primary cursor-grabbing"
-                title={`Задача ${activeId}`}
+                className="ring-primary ring-2 ring-offset-1 cursor-grabbing"
+                title={activeItem.item.title}
               />
-            )
-          ) : null}
-        </DragOverlay>,
-        document.body
-      )}
+            ) : null}
+          </DragOverlay>,
+          document.body
+        )}
     </DndContext>
   );
 }
-
-// HELPERS
-
-const defaultInitializer = (index: number) => index;
-
-function createRange<T = number>(
-  length: number,
-  initializer: (index: number) => any = defaultInitializer
-): T[] {
-  return [...new Array(length)].map((_, index) => initializer(index));
-}
-
-//
 
 const directions: string[] = [
   KeyboardCode.Down,
