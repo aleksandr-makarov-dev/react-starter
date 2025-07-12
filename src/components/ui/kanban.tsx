@@ -82,7 +82,7 @@ export function KanbanCard({
     >
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-row gap-2 items-center flex-1">
-          {users && <AvatarGroup avatars={users} />}
+          {users && <AvatarGroup avatars={users} limit={3} />}
         </div>
         {dueDate && (
           <Badge variant="soft" color="gray">

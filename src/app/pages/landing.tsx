@@ -11,6 +11,17 @@ import { useTranslation } from "react-i18next";
 import z from "zod";
 import { MOCK_COLUMNS, MOCK_ITEMS } from "@/data";
 import { Kanban } from "@/components/closed/kanban";
+import { EllipsisVerticalIcon, PlusIcon } from "lucide-react";
+import { KanbanCard, type BadgeDef } from "@/components/ui/kanban";
+import dayjs from "dayjs";
+
+const badges: BadgeDef[] = [
+  { label: "Фронтенд", color: "blue" },
+  { label: "Бэкенд", color: "green" },
+  { label: "10 Файлов", color: "gray" },
+  { label: "5 Сообщений", color: "gray" },
+  { label: "10 Подзадач", color: "gray" },
+];
 
 function LandingPage() {
   const { t } = useTranslation("App");
@@ -32,6 +43,41 @@ function LandingPage() {
       <Kanban
         columns={MOCK_COLUMNS}
         data={MOCK_ITEMS}
+        renderColumnHeader={({ id, title, count }) => (
+          <React.Fragment>
+            <p className="text-sm font-medium flex-1 flex flex-row gap-2">
+              <span>{title}</span>
+              <span className="text-muted-foreground">{count}</span>
+            </p>
+            <div className="flex flex-row gap-1 items-center">
+              <Button
+                variant="soft"
+                color="gray"
+                size="icon"
+                onClick={() => handleOpenDialog(id.toString())}
+              >
+                <PlusIcon />
+              </Button>
+              <Button variant="soft" color="gray" size="icon">
+                <EllipsisVerticalIcon />
+              </Button>
+            </div>
+          </React.Fragment>
+        )}
+        renderItem={({ id, title }) => (
+          <KanbanCard
+            id={id.toString()}
+            title={title}
+            dueDate={dayjs().toDate()}
+            users={[
+              { fallback: "AN" },
+              { fallback: "BN" },
+              { fallback: "CN" },
+              { fallback: "DN" },
+            ]}
+            badges={badges}
+          />
+        )}
         onColumnDropEnd={({ columnId, index }) =>
           console.log(`Список=${columnId}; Индекс=${index}`)
         }

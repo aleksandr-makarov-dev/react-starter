@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   type UniqueIdentifier,
   useSensors,
@@ -31,14 +30,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { KanbanCard, KanbanColumn, Kanban as KanbanRoot } from "../ui/kanban";
+import { KanbanColumn, Kanban as KanbanRoot } from "../ui/kanban";
 import { createPortal } from "react-dom";
 import { Droppable } from "./droppable";
 import { Draggable } from "./draggable";
 import { cn } from "@/utils/cn";
 import { Button } from "../ui/button";
-import { EllipsisVerticalIcon, GripVerticalIcon, PlusIcon } from "lucide-react";
-import type { ColumnDef, Item } from "@/data";
+import { GripVerticalIcon } from "lucide-react";
 
 export const TRASH_ID = "void";
 const PLACEHOLDER_ID = "placeholder";
@@ -49,9 +47,14 @@ const dropAnimation: DropAnimation = {
   }),
 };
 
-export type KanbanProps = {
-  columns: ColumnDef[];
-  data: Item[];
+export type KanbanProps<
+  T extends { id: UniqueIdentifier },
+  U extends { id: UniqueIdentifier; columnId: UniqueIdentifier }
+> = {
+  columns: T[];
+  data: U[];
+  renderColumnHeader: (column: T & { count: number }) => React.ReactNode;
+  renderItem: (item: U) => React.ReactNode;
   onItemDropEnd?: (args: {
     itemId: UniqueIdentifier;
     columnId: UniqueIdentifier;
@@ -63,21 +66,26 @@ export type KanbanProps = {
   }) => void;
 };
 
-export function Kanban({
+export function Kanban<
+  T extends { id: UniqueIdentifier },
+  U extends { id: UniqueIdentifier; columnId: UniqueIdentifier }
+>({
   columns,
   data,
+  renderColumnHeader,
+  renderItem,
   onColumnDropEnd,
   onItemDropEnd,
-}: KanbanProps) {
+}: KanbanProps<T, U>) {
   const initialItems = useMemo(() => {
     return columns.reduce((acc, col) => {
       acc[col.id] = data.filter((item) => item.columnId === col.id);
       return acc;
-    }, {} as Record<UniqueIdentifier, Item[]>);
+    }, {} as Record<UniqueIdentifier, U[]>);
   }, [columns, data]);
 
   const [items, setItems] =
-    useState<Record<UniqueIdentifier, Item[]>>(initialItems);
+    useState<Record<UniqueIdentifier, U[]>>(initialItems);
   const [containers, setContainers] = useState<UniqueIdentifier[]>(
     columns.map((col) => col.id)
   );
@@ -86,7 +94,7 @@ export function Kanban({
   const recentlyMovedToNewContainer = useRef(false);
   const [clonedItems, setClonedItems] = useState<Record<
     UniqueIdentifier,
-    Item[]
+    U[]
   > | null>(null);
 
   const sensors = useSensors(
@@ -151,7 +159,7 @@ export function Kanban({
         : items[overContainer].length;
     recentlyMovedToNewContainer.current = true;
 
-    setItems((prev): Record<UniqueIdentifier, Item[]> => {
+    setItems((prev): Record<UniqueIdentifier, U[]> => {
       const activeItem = prev[activeContainer][activeIndex];
       return {
         ...prev,
@@ -312,8 +320,8 @@ export function Kanban({
   );
 
   const activeItem:
-    | { type: "column"; column: ColumnDef; items: Item[] }
-    | { type: "item"; item: Item }
+    | { type: "column"; column: T; items: U[] }
+    | { type: "item"; item: U }
     | undefined = useMemo(() => {
     if (!activeId) return undefined;
 
@@ -337,7 +345,7 @@ export function Kanban({
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetectionStrategy}
-      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+      measuring={{ droppable: { strategy: MeasuringStrategy.BeforeDragging } }}
       onDragStart={handleDragStart}
       onDragCancel={handleDragCancel}
       onDragOver={handleDragOver}
@@ -362,6 +370,9 @@ export function Kanban({
                   const column = columns.find(
                     (column) => column.id === containerId
                   );
+
+                  if (!column) return null;
+
                   const containerItems = items[containerId] ?? [];
                   const count = containerItems.length;
 
@@ -389,28 +400,10 @@ export function Kanban({
                                 >
                                   <GripVerticalIcon />
                                 </Button>
-                                <p className="text-sm font-medium flex-1 flex flex-row gap-2">
-                                  <span>{column?.title}</span>
-                                  <span className="text-muted-foreground">
-                                    {count}
-                                  </span>
-                                </p>
-                                <div className="flex flex-row gap-1 items-center">
-                                  <Button
-                                    variant="soft"
-                                    color="gray"
-                                    size="icon"
-                                  >
-                                    <PlusIcon />
-                                  </Button>
-                                  <Button
-                                    variant="soft"
-                                    color="gray"
-                                    size="icon"
-                                  >
-                                    <EllipsisVerticalIcon />
-                                  </Button>
-                                </div>
+                                {renderColumnHeader({
+                                  ...column,
+                                  count: count,
+                                })}
                               </React.Fragment>
                             }
                           >
@@ -427,17 +420,17 @@ export function Kanban({
                                     listeners,
                                     style,
                                   }) => (
-                                    <KanbanCard
+                                    <div
                                       ref={setNodeRef}
-                                      id={item.id.toString()}
                                       style={style}
                                       className={cn({
                                         "opacity-50": isDragging,
                                       })}
-                                      title={item.title}
                                       {...attributes}
                                       {...listeners}
-                                    />
+                                    >
+                                      {renderItem(item)}
+                                    </div>
                                   )}
                                 </Draggable>
                               ))}
@@ -470,32 +463,19 @@ export function Kanban({
                     >
                       <GripVerticalIcon />
                     </Button>
-                    <p className="text-sm font-medium flex-1 flex flex-row gap-2">
-                      <span>{activeItem.column.title}</span>
-                      <span className="text-muted-foreground">
-                        {activeItem.items.length}
-                      </span>
-                    </p>
-                    <div className="flex flex-row gap-1 items-center">
-                      <Button variant="soft" color="gray" size="icon">
-                        <PlusIcon />
-                      </Button>
-                      <Button variant="soft" color="gray" size="icon">
-                        <EllipsisVerticalIcon />
-                      </Button>
-                    </div>
+                    {renderColumnHeader({
+                      ...activeItem.column,
+                      count: activeItem.items.length,
+                    })}
                   </React.Fragment>
                 }
               >
-                {activeItem.items.map((item) => (
-                  <KanbanCard title={item.title} />
-                ))}
+                {activeItem.items.map((item) => renderItem(item))}
               </KanbanColumn>
             ) : activeItem?.type === "item" ? (
-              <KanbanCard
-                className="ring-primary ring-2 ring-offset-1 cursor-grabbing"
-                title={activeItem.item.title}
-              />
+              <div className="ring-primary ring-2 ring-offset-2 cursor-grabbing rounded">
+                {renderItem(activeItem.item)}
+              </div>
             ) : null}
           </DragOverlay>,
           document.body

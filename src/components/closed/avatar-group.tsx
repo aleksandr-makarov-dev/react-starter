@@ -27,7 +27,7 @@ export function AvatarGroup({ avatars, limit = 0 }: AvatarGroupProps) {
       {visibleAvatars.map((avatar, index) => (
         <Avatar key={`avatar-${index}`} className="size-5">
           <AvatarImage src={avatar.image} alt={avatar.alt} />
-          <AvatarFallback>{avatar.fallback}</AvatarFallback>
+          <AvatarFallback className="text-xs">{avatar.fallback}</AvatarFallback>
         </Avatar>
       ))}
       {remaining > 0 && (
