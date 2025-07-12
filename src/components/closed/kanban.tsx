@@ -7,33 +7,38 @@ import {
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
-  DndContext,
   closestCorners,
+  DndContext,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type React from "react";
+import { useState, useEffect, useMemo } from "react";
+import { KanbanRoot } from "../ui/kanban";
 
-export type KanbanItemBase = { id: string; columnId: string };
-
-type KanbanContextType<T extends KanbanItemBase> = {
-  groups: { [key: string]: T[] };
-  activeItem: T | null;
+export type ColumnDef = {
+  id: string;
+  title: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const KanbanContext = createContext<KanbanContextType<any> | null>(null);
-
-export type KanbanProviderProps<T extends KanbanItemBase> = {
-  columns: string[];
+export type KanbanProps<T> = {
+  columns: ColumnDef[];
   data: T[];
-  children: React.ReactNode;
+  getId: (item: T) => string;
+  getColumnId: (item: T) => string;
+  children: (args: {
+    columns: ColumnDef[];
+    groups: { [key: string]: T[] };
+    activeItem: T | null;
+  }) => React.ReactNode;
 };
 
-export function KanbanProvider<T extends KanbanItemBase>({
+export function Kanban<T>({
   columns = [],
   data = [],
+  getId,
+  getColumnId,
   children,
-}: KanbanProviderProps<T>) {
+}: KanbanProps<T>) {
   const [groups, setGroups] = useState<{ [key: string]: T[] }>({});
 
   // DND
@@ -49,20 +54,20 @@ export function KanbanProvider<T extends KanbanItemBase>({
   );
 
   useEffect(() => {
-    const grouped = columns.reduce((acc, columnId) => {
-      acc[columnId] = data.filter((item) => item.columnId === columnId);
+    const grouped = columns.reduce((acc, column) => {
+      acc[column.id] = data.filter((item) => getColumnId(item) === column.id);
       return acc;
     }, {} as Record<string, T[]>);
 
     setGroups(grouped);
-  }, [columns, data]);
+  }, [columns, data, getColumnId]);
 
   const findContainer = (id: UniqueIdentifier) => {
     if (id in groups) {
       return id;
     }
     return Object.keys(groups).find((key: string) =>
-      groups[key].map((item) => item.id).includes(id.toString())
+      groups[key].map((item) => getId(item)).includes(id.toString())
     );
   };
 
@@ -95,9 +100,9 @@ export function KanbanProvider<T extends KanbanItemBase>({
       const activeItems = prev[activeContainer];
       const overItems = prev[overContainer];
 
-      const activeIndex = activeItems.map((items) => items.id).indexOf(id);
+      const activeIndex = activeItems.map((item) => getId(item)).indexOf(id);
       const overIndex = overItems
-        .map((items) => items.id)
+        .map((item) => getId(item))
         .indexOf(overId.toString());
 
       let newIndex;
@@ -114,7 +119,7 @@ export function KanbanProvider<T extends KanbanItemBase>({
       return {
         ...prev,
         [activeContainer]: [
-          ...prev[activeContainer].filter((items) => items.id !== active.id),
+          ...prev[activeContainer].filter((item) => getId(item) !== active.id),
         ],
         [overContainer]: [
           ...prev[overContainer].slice(0, newIndex),
@@ -144,10 +149,10 @@ export function KanbanProvider<T extends KanbanItemBase>({
     }
 
     const activeIndex = groups[activeContainer]
-      .map((item) => item.id)
+      .map((item) => getId(item))
       .indexOf(id);
     const overIndex = groups[overContainer]
-      .map((item) => item.id)
+      .map((item) => getId(item))
       .indexOf(overId.toString());
 
     if (activeIndex !== overIndex) {
@@ -167,32 +172,18 @@ export function KanbanProvider<T extends KanbanItemBase>({
     if (!activeId) return null;
 
     const list = Object.values(groups).flat();
-    return list.find((item) => item.id === activeId) || null;
-  }, [activeId, groups]);
+    return list.find((item) => getId(item) === activeId) || null;
+  }, [activeId, getId, groups]);
 
   return (
-    <KanbanContext.Provider value={{ groups: groups, activeItem: activeItem }}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        {children}
-      </DndContext>
-    </KanbanContext.Provider>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <KanbanRoot>{children({ columns, groups, activeItem })}</KanbanRoot>
+    </DndContext>
   );
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useKanban<T extends KanbanItemBase>() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const context = useContext<KanbanContextType<any> | null>(KanbanContext);
-
-  if (!context) {
-    throw new Error("useKanban must be used within a KanbanContext");
-  }
-
-  return context as KanbanContextType<T>;
 }

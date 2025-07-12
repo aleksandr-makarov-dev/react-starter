@@ -2,6 +2,8 @@ import { Badge, badgeVariants } from "./badge";
 import type { VariantProps } from "class-variance-authority";
 import { AvatarGroup, type AvatarDef } from "../closed/avatar-group";
 import { formatDate } from "@/utils/format-date";
+import type { HtmlHTMLAttributes, Ref } from "react";
+import { cn } from "@/utils/cn";
 
 export type KanbanRootProps = {
   children: React.ReactNode;
@@ -20,16 +22,25 @@ export type KanbanColumnProps = {
   count: number;
   children: React.ReactNode;
   actions?: React.ReactNode;
-};
+  ref?: Ref<HTMLDivElement>;
+} & HtmlHTMLAttributes<HTMLDivElement>;
 
 export function KanbanColumn({
   title,
   count,
   children,
   actions,
+  className,
+  ...props
 }: KanbanColumnProps) {
   return (
-    <div className="w-80 shrink-0 bg-accent rounded flex flex-col h-full">
+    <div
+      className={cn(
+        "w-80 shrink-0 bg-accent rounded flex flex-col h-full",
+        className
+      )}
+      {...props}
+    >
       <div className="p-2 pb-1 flex flex-row items-center">
         <p className="text-sm font-medium flex-1 flex flex-row gap-2">
           <span>{title}</span>
@@ -61,7 +72,8 @@ export type KanbanCardProps = {
   dueDate?: Date | undefined | null;
   badges?: BadgeDef[];
   users?: AvatarDef[];
-};
+  ref?: Ref<HTMLDivElement>;
+} & HtmlHTMLAttributes<HTMLDivElement>;
 
 export function KanbanCard({
   id,
@@ -69,9 +81,17 @@ export function KanbanCard({
   dueDate,
   users,
   badges,
+  className,
+  ...props
 }: KanbanCardProps) {
   return (
-    <div className="bg-background border flex flex-col gap-2 p-2 rounded shrink-0">
+    <div
+      className={cn(
+        "bg-background border flex flex-col gap-2 p-2 rounded shrink-0",
+        className
+      )}
+      {...props}
+    >
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-row gap-2 items-center flex-1">
           {users && <AvatarGroup avatars={users} />}

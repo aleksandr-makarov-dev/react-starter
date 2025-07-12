@@ -1,11 +1,18 @@
-import { cn } from "@/utils/cn";
-import type { UniqueIdentifier } from "@dnd-kit/core";
+import type { DraggableAttributes, UniqueIdentifier } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { CSSProperties } from "react";
 
 export type DraggableProps = {
   id: UniqueIdentifier;
-  children: React.ReactNode;
+  children: (args: {
+    setNodeRef: (node: HTMLElement | null) => void;
+    attributes: DraggableAttributes;
+    listeners: SyntheticListenerMap | undefined;
+    style: CSSProperties | undefined;
+    isDragging: boolean;
+  }) => React.ReactNode;
 };
 
 export function Draggable({ id, children }: DraggableProps) {
@@ -23,17 +30,5 @@ export function Draggable({ id, children }: DraggableProps) {
     transition: transition,
   };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn({
-        "opacity-50": isDragging,
-      })}
-      {...attributes}
-      {...listeners}
-    >
-      {children}
-    </div>
-  );
+  return children({ setNodeRef, attributes, listeners, style, isDragging });
 }
