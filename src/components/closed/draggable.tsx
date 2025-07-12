@@ -12,6 +12,7 @@ export type DraggableProps = {
     listeners: SyntheticListenerMap | undefined;
     style: CSSProperties | undefined;
     isDragging: boolean;
+    setActivatorNodeRef: (element: HTMLElement | null) => void;
   }) => React.ReactNode;
 };
 
@@ -23,6 +24,7 @@ export function Draggable({ id, children }: DraggableProps) {
     transform,
     transition,
     isDragging,
+    setActivatorNodeRef,
   } = useSortable({ id: id });
 
   const style = {
@@ -30,5 +32,12 @@ export function Draggable({ id, children }: DraggableProps) {
     transition: transition,
   };
 
-  return children({ setNodeRef, attributes, listeners, style, isDragging });
+  return children({
+    setNodeRef,
+    attributes,
+    listeners,
+    style,
+    isDragging,
+    setActivatorNodeRef,
+  });
 }

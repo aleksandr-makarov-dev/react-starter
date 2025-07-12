@@ -18,18 +18,14 @@ export function KanbanRoot({ children }: KanbanRootProps) {
 }
 
 export type KanbanColumnProps = {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
+  header?: React.ReactNode;
+  children?: React.ReactNode;
   ref?: Ref<HTMLDivElement>;
 } & HtmlHTMLAttributes<HTMLDivElement>;
 
 export function KanbanColumn({
-  title,
-  count,
+  header,
   children,
-  actions,
   className,
   ...props
 }: KanbanColumnProps) {
@@ -41,14 +37,8 @@ export function KanbanColumn({
       )}
       {...props}
     >
-      <div className="p-2 pb-1 flex flex-row items-center">
-        <p className="text-sm font-medium flex-1 flex flex-row gap-2">
-          <span>{title}</span>
-          <span className="text-muted-foreground">{count}</span>
-        </p>
-        <div className="flex flex-row gap-1">{actions}</div>
-      </div>
-      <div className="flex flex-col gap-1.5 flex-1 p-2 pt-1 overflow-y-auto">
+      <div className="p-2 flex flex-row items-center gap-2">{header}</div>
+      <div className="flex flex-col gap-1.5 flex-1 p-2 pt-0 overflow-y-auto">
         {children}
       </div>
     </div>

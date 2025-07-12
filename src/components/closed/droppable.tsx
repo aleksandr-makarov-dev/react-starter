@@ -1,7 +1,7 @@
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, type UniqueIdentifier } from "@dnd-kit/core";
 
 export type DroppableProps = {
-  id: string;
+  id: UniqueIdentifier;
   children: (args: {
     setNodeRef: (element: HTMLElement | null) => void;
     isOver: boolean;

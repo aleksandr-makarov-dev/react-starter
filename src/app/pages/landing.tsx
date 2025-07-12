@@ -9,17 +9,8 @@ import { useDialog } from "@/hooks/use-dialog";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import z from "zod";
-import { MOCK_COLUMNS, MOCK_ITEMS } from "@/data";
-import { KanbanCard, KanbanColumn } from "@/components/ui/kanban";
-import { DragOverlay } from "@dnd-kit/core";
-import { Droppable } from "@/components/closed/droppable";
-import { Draggable } from "@/components/closed/draggable";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { MOCK_COLUMNS } from "@/data";
 import { Kanban } from "@/components/closed/kanban";
-import { cn } from "@/utils/cn";
 
 function LandingPage() {
   const { t } = useTranslation("App");
@@ -38,67 +29,7 @@ function LandingPage() {
 
   return (
     <div className="h-screen flex flex-1 p-2">
-      <Kanban
-        columns={MOCK_COLUMNS}
-        data={MOCK_ITEMS}
-        getId={(item) => item.id}
-        getColumnId={(item) => item.columnId}
-      >
-        {({ columns, groups, activeItem }) => (
-          <React.Fragment>
-            {columns.map((column) => {
-              const items = groups[column.id] ?? [];
-
-              return (
-                <Droppable id={column.id}>
-                  {({ setNodeRef }) => (
-                    <KanbanColumn
-                      key={column.id}
-                      ref={setNodeRef}
-                      title={column.title}
-                      count={items.length}
-                    >
-                      <SortableContext
-                        items={items.map((item) => item.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {items.map((item) => (
-                          <Draggable id={item.id}>
-                            {({
-                              setNodeRef,
-                              attributes,
-                              listeners,
-                              style,
-                              isDragging,
-                            }) => (
-                              <KanbanCard
-                                ref={setNodeRef}
-                                style={style}
-                                className={cn({ "opacity-50": isDragging })}
-                                id={item.id}
-                                title={item.title}
-                                {...attributes}
-                                {...listeners}
-                              />
-                            )}
-                          </Draggable>
-                        ))}
-                      </SortableContext>
-                    </KanbanColumn>
-                  )}
-                </Droppable>
-              );
-            })}
-            <DragOverlay>
-              {activeItem && (
-                <div className="ring-primary ring-2 ring-offset-1 rounded cursor-grab">
-                  <KanbanCard id={activeItem.id} title={activeItem.title} />
-                </div>
-              )}
-            </DragOverlay>
-          </React.Fragment>
-        )}
-      </Kanban>
+      <Kanban />
       <FormDialog
         title="Создание объекта"
         description="Создание объекта очень трудоемкая операция."
